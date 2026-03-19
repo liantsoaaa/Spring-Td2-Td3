@@ -1,6 +1,9 @@
 package com.example.tdspring.controller;
 
 import com.example.tdspring.model.Student;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
@@ -12,37 +15,77 @@ public class StudentController {
 
     private final List<Student> students = new ArrayList<>();
 
-    // A) GET /welcome
+    // a) GET /welcome
     @GetMapping("/welcome")
-    public String welcome(@RequestParam String name) {
-        return "Welcome " + name;
+    public ResponseEntity<String> welcome(
+            @RequestParam(required = false) String name) {
+
+        if (name == null || name.isBlank()) {
+            return ResponseEntity
+                    .status(HttpStatus.BAD_REQUEST)
+                    .body("Paramètre 'name' vide");
+        }
+
+        return ResponseEntity
+                .status(HttpStatus.OK)
+                .body("Welcome " + name);
     }
 
-    // B) POST /students
+    // b) POST /students
     @PostMapping("/students")
-    public String addStudents(@RequestBody List<Student> newStudents) {
-        students.addAll(newStudents);
-        return students.stream()
-                .map(s -> s.getFirstName() + " " + s.getLastName())
-                .collect(Collectors.joining(", "));
+    public ResponseEntity<List<Student>> addStudents(
+            @RequestBody List<Student> newStudents) {
+
+        try {
+            students.addAll(newStudents);
+            return ResponseEntity
+                    .status(HttpStatus.CREATED)
+                    .body(students);
+        } catch (Exception e) {
+            return ResponseEntity
+                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .build();
+        }
     }
 
-    // C) GET /students
+    // c) GET /students
     @GetMapping("/students")
-    public org.springframework.http.ResponseEntity<String> getStudents(
-            @RequestHeader(value = "Accept", defaultValue = "") String accept) {
+    public ResponseEntity<?> getStudents(
+            @RequestHeader(value = "Accept", required = false) String accept) {
 
-        if ("text/plain".equals(accept)) {
-            String names = students.stream()
-                    .map(s -> s.getFirstName() + " " + s.getLastName())
-                    .collect(Collectors.joining(", "));
-            return org.springframework.http.ResponseEntity.ok()
-                    .header("Content-Type", "text/plain")
-                    .body(names);
-        } else {
-            return org.springframework.http.ResponseEntity
-                    .status(415)
-                    .body("Format non supporté");
+        if (accept == null || accept.isBlank()) {
+            return ResponseEntity
+                    .status(HttpStatus.BAD_REQUEST)
+                    .body("Entête 'Accept' vide");
+        }
+
+        try {
+            if (accept.contains(MediaType.TEXT_PLAIN_VALUE)) {
+                String names = students.stream()
+                        .map(s -> s.getFirstName() + " " + s.getLastName())
+                        .collect(Collectors.joining(", "));
+
+                return ResponseEntity
+                        .status(HttpStatus.OK)
+                        .contentType(MediaType.TEXT_PLAIN)
+                        .body(names);
+
+            } else if (accept.contains(MediaType.APPLICATION_JSON_VALUE)) {
+                return ResponseEntity
+                        .status(HttpStatus.OK)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body(students);
+
+            } else {
+                return ResponseEntity
+                        .status(HttpStatus.HTTP_VERSION_NOT_SUPPORTED)
+                        .body("Format non supporté");
+            }
+
+        } catch (Exception e) {
+            return ResponseEntity
+                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .build();
         }
     }
 }

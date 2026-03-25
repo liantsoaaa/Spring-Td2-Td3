@@ -1,21 +1,23 @@
 package com.example.tdspring.controller;
 
 import com.example.tdspring.model.Student;
+import com.example.tdspring.service.StudentService;
+import com.example.tdspring.validator.StudentValidator;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
 @RestController
 public class StudentController {
+    private final StudentService studentService = new StudentService();
+    private final StudentValidator studentValidator = new StudentValidator();
 
-    private final List<Student> students = new ArrayList<>();
-
-    // a) GET /welcome
+    // GET /welcome?name=xxx
     @GetMapping("/welcome")
     public ResponseEntity<String> welcome(
             @RequestParam(required = false) String name) {
@@ -23,7 +25,7 @@ public class StudentController {
         if (name == null || name.isBlank()) {
             return ResponseEntity
                     .status(HttpStatus.BAD_REQUEST)
-                    .body("Paramètre 'name' vide");
+                    .body("Paramètre 'name'vide");
         }
 
         return ResponseEntity
@@ -31,16 +33,21 @@ public class StudentController {
                 .body("Welcome " + name);
     }
 
-    // b) POST /students
+    // POST /students
     @PostMapping("/students")
-    public ResponseEntity<List<Student>> addStudents(
+    public ResponseEntity<?> addStudents(
             @RequestBody List<Student> newStudents) {
 
         try {
-            students.addAll(newStudents);
+            studentValidator.validate(newStudents);
+            List<Student> allStudents = studentService.addStudents(newStudents);
             return ResponseEntity
                     .status(HttpStatus.CREATED)
-                    .body(students);
+                    .body(allStudents);
+        } catch (ResponseStatusException e) {
+            return ResponseEntity
+                    .status(e.getStatusCode())
+                    .body(e.getReason());
         } catch (Exception e) {
             return ResponseEntity
                     .status(HttpStatus.INTERNAL_SERVER_ERROR)
@@ -48,7 +55,7 @@ public class StudentController {
         }
     }
 
-    // c) GET /students
+    // GET /students
     @GetMapping("/students")
     public ResponseEntity<?> getStudents(
             @RequestHeader(value = "Accept", required = false) String accept) {
@@ -60,8 +67,10 @@ public class StudentController {
         }
 
         try {
+            List<Student> allStudents = studentService.getAllStudents();
+
             if (accept.contains(MediaType.TEXT_PLAIN_VALUE)) {
-                String names = students.stream()
+                String names = allStudents.stream()
                         .map(s -> s.getFirstName() + " " + s.getLastName())
                         .collect(Collectors.joining(", "));
 
@@ -74,11 +83,11 @@ public class StudentController {
                 return ResponseEntity
                         .status(HttpStatus.OK)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .body(students);
+                        .body(allStudents);
 
             } else {
                 return ResponseEntity
-                        .status(HttpStatus.HTTP_VERSION_NOT_SUPPORTED)
+                        .status(HttpStatus.NOT_IMPLEMENTED)
                         .body("Format non supporté");
             }
 
